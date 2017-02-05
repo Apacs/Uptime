@@ -2,20 +2,19 @@
 
 // Config
 $basepath = '/uptime/';
-$filename = 'db.json';
+$datafile = 'db.json';
 $minsame = 5;
-$maxsame = 50;
+$maxsame = 100;
 $percentok = 50;
-$logfile = 'log.txt';
 $sleep = 120;
-date_default_timezone_set('Europe/Berlin');
 
 // Action
+date_default_timezone_set('Europe/Berlin');
 $db = array();
 $uri = str_replace($basepath, '', $_SERVER['REQUEST_URI']);
 $count = rand($minsame, $maxsame);
 
-if(file_exists($filename)) { $db = json_decode(file_get_contents($filename), true); }
+if(file_exists('data/' .$datafile)) { $db = json_decode(file_get_contents('data/' . $datafile), true); }
 
 if(array_key_exists($uri, $db))
 {
@@ -33,9 +32,10 @@ if(!array_key_exists($uri, $db))
     else { $db[$uri] = get_error($count); }
 }
 
-file_put_contents($filename, json_encode($db));
+if(!file_exists('data')) { mkdir('data', 0700); }
+file_put_contents('data/' . $datafile, json_encode($db));
 
-writelog($logfile, $db[$uri]);
+writelog($db[$uri]);
 
 if($db[$uri]['code'] == 'time') { sleep($sleep); }
 else
@@ -98,11 +98,11 @@ function get_error($count, $ok = NULL)
 }
 
 // Writes hit to log
-function writelog($logfile, $response)
+function writelog($response)
 {
     $logtext = implode(' ', array(
         'ip'            => $_SERVER['REMOTE_ADDR'],
-        'time'          => date("Y-m-d H:i:s"),
+        'time'          => date('Y-m-d H:i:s'),
         'agent'         => $_SERVER['HTTP_USER_AGENT'],
         'method'        => $_SERVER['REQUEST_METHOD'],
         'uri'           => $_SERVER['REQUEST_URI'],
@@ -115,7 +115,9 @@ function writelog($logfile, $response)
 
     $logtext .= "\n";
 
-    $log = fopen($logfile, 'a');
+    if(!file_exists('logs')) { mkdir('logs', 0700); }
+    $logfile = date('Y-m-d') . '_uptime_log.txt';
+    $log = fopen('logs/' . $logfile, 'a');
     fwrite($log, $logtext);
     fclose($log);
 
