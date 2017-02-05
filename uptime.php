@@ -1,16 +1,16 @@
 <?php
 
-//Config
-
+// Config
 $basepath = '/uptime/';
 $filename = 'db.json';
 $minsame = 5;
 $maxsame = 50;
 $percentok = 50;
-$sleep = 60;
+$logfile = 'log.txt';
+$sleep = 120;
+date_default_timezone_set('Europe/Berlin');
 
 // Action
-
 $db = array();
 $uri = str_replace($basepath, '', $_SERVER['REQUEST_URI']);
 $count = rand($minsame, $maxsame);
@@ -30,26 +30,25 @@ if(array_key_exists($uri, $db))
 if(!array_key_exists($uri, $db))
 {
     if(rand(1, 100) <= $percentok) { $db[$uri] = get_error($count, $ok = '200'); }
-    else { $db[$uri] = get_error($count, $ok = NULL); }
+    else { $db[$uri] = get_error($count); }
 }
 
 file_put_contents($filename, json_encode($db));
+
+writelog($logfile, $db[$uri]);
 
 if($db[$uri]['code'] == 'time') { sleep($sleep); }
 else
 {
     $protocol = (isset($_SERVER['SERVER_PROTOCOL']) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0');
-
     header($protocol . ' ' . $db[$uri]['code'] . ' ' . $db[$uri]['description']);
-
     echo $protocol . ' ' . $db[$uri]['code'] . ' ' . $db[$uri]['description'] . ' (' . $db[$uri]['count'] . ')';
 }
 
 exit();
 
 // Returns one random error code, or a 200 if requested
-
-function get_error($count, $ok)
+function get_error($count, $ok = NULL)
 {
     if($ok == '200')
     {
@@ -88,7 +87,6 @@ function get_error($count, $ok)
         );
 
         $key = array_rand($codes, 1);
-
         $errorcode = array(
             'code'          => $key,
             'description'   => $codes[$key],
@@ -97,4 +95,29 @@ function get_error($count, $ok)
     }
 
     return $errorcode;
+}
+
+// Writes hit to log
+function writelog($logfile, $response)
+{
+    $logtext = implode(' ', array(
+        'ip'            => $_SERVER['REMOTE_ADDR'],
+        'time'          => date("Y-m-d H:i:s"),
+        'agent'         => $_SERVER['HTTP_USER_AGENT'],
+        'method'        => $_SERVER['REQUEST_METHOD'],
+        'uri'           => $_SERVER['REQUEST_URI'],
+        'port'          => $_SERVER['SERVER_PORT'],
+        'protocol'      => $_SERVER['SERVER_PROTOCOL'],
+        'code'          => $response['code'],
+        'description'   => $response['description'],
+        'count'         => $response['count']
+    ));
+
+    $logtext .= "\n";
+
+    $log = fopen($logfile, 'a');
+    fwrite($log, $logtext);
+    fclose($log);
+
+    return true;
 }
